@@ -1,0 +1,274 @@
+-- Whjte Void Spam | Fixed Tabs + Mobile Support
+-- RightShift = Toggle GUI | Big Menu Button on Mobile
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+
+local TargetPlayer = nil
+local VoidSpamEnabled = false
+local OrbitAttackEnabled = false
+
+local Settings = {
+    VoidSpamDistance = 15,
+    OrbitRadius = 8,
+    OrbitSpeed = 15,
+    SpamRate = 0.08,
+}
+
+local lastSpam = 0
+local orbitAngle = 0
+
+-- ==================== GUI ====================
+local sg = Instance.new("ScreenGui")
+sg.Name = "WhjteVoidSpam"
+sg.ResetOnSpawn = false
+sg.DisplayOrder = 999999
+sg.Parent = game:GetService("CoreGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 320, 0, 520)
+mainFrame.Position = UDim2.new(0.5, -160, 0.2, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 35)
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = sg
+
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
+Instance.new("UIStroke", mainFrame).Color = Color3.fromRGB(130, 0, 255)
+
+-- Title
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,0,0,50)
+title.BackgroundColor3 = Color3.fromRGB(90, 0, 220)
+title.Text = "⚡ Whjte Void Spam"
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 20
+title.Parent = mainFrame
+Instance.new("UICorner", title).CornerRadius = UDim.new(0,12)
+
+-- Tab Buttons
+local tabFrame = Instance.new("Frame", mainFrame)
+tabFrame.Size = UDim2.new(1,0,0,45)
+tabFrame.Position = UDim2.new(0,0,0,50)
+tabFrame.BackgroundTransparency = 1
+
+local contents = {}
+
+local function switchTab(tabName)
+    for _, content in pairs(contents) do
+        content.Visible = false
+    end
+    if contents[tabName] then
+        contents[tabName].Visible = true
+    end
+end
+
+local function createTabButton(name, position)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.25, -4, 1, 0)
+    btn.Position = UDim2.new(position, 2, 0, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(40,40,70)
+    btn.Text = name
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 15
+    btn.Parent = tabFrame
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
+    
+    local content = Instance.new("ScrollingFrame")
+    content.Size = UDim2.new(1,0,1,-110)
+    content.Position = UDim2.new(0,0,0,105)
+    content.BackgroundTransparency = 1
+    content.ScrollBarThickness = 6
+    content.Parent = mainFrame
+    content.Visible = false
+    
+    local list = Instance.new("UIListLayout", content)
+    list.Padding = UDim.new(0,8)
+    list.SortOrder = Enum.SortOrder.LayoutOrder
+    
+    contents[name] = content
+    
+    btn.MouseButton1Click:Connect(function()
+        switchTab(name)
+    end)
+    
+    return content
+end
+
+-- Create Tabs
+local voidContent = createTabButton("Void Spam", 0)
+local orbitContent = createTabButton("Orbit", 0.25)
+local settingsContent = createTabButton("Settings", 0.5)
+local infoContent = createTabButton("Info", 0.75)
+
+-- ==================== TOGGLE BUTTON ====================
+local function createToggle(parent, text, default, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.95, 0, 0, 55)
+    btn.BackgroundColor3 = default and Color3.fromRGB(0, 170, 80) or Color3.fromRGB(60, 60, 90)
+    btn.Text = text .. ": " .. (default and "ON" or "OFF")
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 17
+    btn.Parent = parent
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,10)
+    
+    local state = default
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        btn.BackgroundColor3 = state and Color3.fromRGB(0, 170, 80) or Color3.fromRGB(60, 60, 90)
+        btn.Text = text .. ": " .. (state and "ON" or "OFF")
+        callback(state)
+    end)
+    return btn
+end
+
+-- ==================== SLIDER ====================
+local function createSlider(parent, label, min, max, default, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0.95, 0, 0, 70)
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
+
+    local lbl = Instance.new("TextLabel", frame)
+    lbl.Size = UDim2.new(1,0,0,25)
+    lbl.Text = label .. ": " .. default
+    lbl.TextColor3 = Color3.new(1,1,1)
+    lbl.BackgroundTransparency = 1
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 16
+
+    local bar = Instance.new("Frame", frame)
+    bar.Size = UDim2.new(1,0,0,14)
+    bar.Position = UDim2.new(0,0,0,32)
+    bar.BackgroundColor3 = Color3.fromRGB(50,50,80)
+    Instance.new("UICorner", bar).CornerRadius = UDim.new(0,7)
+
+    local fill = Instance.new("Frame", bar)
+    fill.Size = UDim2.new((default-min)/(max-min),0,1,0)
+    fill.BackgroundColor3 = Color3.fromRGB(130, 0, 255)
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(0,7)
+
+    local dragging = false
+    bar.InputBegan:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(inp)
+        if not dragging then return end
+        local percent = math.clamp((inp.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
+        local value = math.round(min + percent * (max - min))
+        fill.Size = UDim2.new((value - min)/(max - min), 0, 1, 0)
+        lbl.Text = label .. ": " .. value
+        callback(value)
+    end)
+end
+
+-- ==================== FILL TABS ====================
+
+-- Void Spam Tab
+createToggle(voidContent, "Void Spam", false, function(v) VoidSpamEnabled = v end)
+createSlider(voidContent, "Void Distance", 5, 50, 15, function(v) Settings.VoidSpamDistance = v end)
+
+-- Orbit Tab
+createToggle(orbitContent, "Orbit Attack", false, function(v) OrbitAttackEnabled = v end)
+createSlider(orbitContent, "Orbit Radius", 4, 25, 8, function(v) Settings.OrbitRadius = v end)
+createSlider(orbitContent, "Orbit Speed", 5, 40, 15, function(v) Settings.OrbitSpeed = v end)
+
+-- Settings Tab
+createSlider(settingsContent, "Spam Rate (lower = faster)", 0.02, 0.2, 0.08, function(v) Settings.SpamRate = v end)
+
+-- Info Tab
+local distanceLabel = Instance.new("TextLabel")
+distanceLabel.Size = UDim2.new(0.95,0,0,120)
+distanceLabel.BackgroundTransparency = 1
+distanceLabel.TextColor3 = Color3.new(1,1,1)
+distanceLabel.Font = Enum.Font.GothamBold
+distanceLabel.TextSize = 18
+distanceLabel.Text = "No Target\nDistance: 0 studs"
+distanceLabel.Parent = infoContent
+
+-- Mobile Menu Button
+local menuBtn = Instance.new("TextButton")
+menuBtn.Size = UDim2.new(0,90,0,60)
+menuBtn.Position = UDim2.new(0,15,0,15)
+menuBtn.BackgroundColor3 = Color3.fromRGB(90,0,220)
+menuBtn.Text = "MENU"
+menuBtn.TextColor3 = Color3.new(1,1,1)
+menuBtn.Font = Enum.Font.GothamBold
+menuBtn.TextSize = 16
+menuBtn.Parent = sg
+Instance.new("UICorner", menuBtn).CornerRadius = UDim.new(0,12)
+
+menuBtn.MouseButton1Click:Connect(function()
+    sg.Enabled = not sg.Enabled
+end)
+
+-- Initial Tab
+switchTab("Void Spam")
+
+-- ==================== MAIN LOOP ====================
+RunService.RenderStepped:Connect(function(dt)
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+
+    -- Auto Target
+    if not TargetPlayer or not TargetPlayer.Character then
+        local closest, dist = nil, math.huge
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local d = (plr.Character.HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude
+                if d < dist then
+                    dist = d
+                    closest = plr
+                end
+            end
+        end
+        TargetPlayer = closest
+    end
+
+    -- Void Spam
+    if VoidSpamEnabled and TargetPlayer and TargetPlayer.Character and tick() - lastSpam > Settings.SpamRate then
+        local hrp = char.HumanoidRootPart
+        local thrp = TargetPlayer.Character.HumanoidRootPart
+        local dir = (hrp.Position - thrp.Position).Unit
+        hrp.CFrame = thrp.CFrame + dir * Settings.VoidSpamDistance + Vector3.new(math.random(-8,8), math.random(5,15), math.random(-8,8))
+        lastSpam = tick()
+    end
+
+    -- Orbit Attack
+    if OrbitAttackEnabled and TargetPlayer and TargetPlayer.Character then
+        local hrp = char.HumanoidRootPart
+        local thrp = TargetPlayer.Character.HumanoidRootPart
+        orbitAngle += Settings.OrbitSpeed * dt * 7
+        local offset = Vector3.new(math.cos(orbitAngle) * Settings.OrbitRadius, 6, math.sin(orbitAngle) * Settings.OrbitRadius)
+        hrp.CFrame = CFrame.new(thrp.Position + offset, thrp.Position)
+    end
+
+    -- Update Distance
+    if TargetPlayer and TargetPlayer.Character then
+        local dist = (TargetPlayer.Character.HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude
+        distanceLabel.Text = "Target: " .. TargetPlayer.Name .. "\nDistance: " .. math.floor(dist) .. " studs"
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        sg.Enabled = not sg.Enabled
+    end
+end)
+
+print("✅ Whjte Void Spam Loaded | Tap MENU or RightShift")
