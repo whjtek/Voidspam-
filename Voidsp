@@ -1,0 +1,55 @@
+-- Whjte Void Spam | Rivals Style GUI
+-- RightShift or Menu Button to toggle
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+
+local TargetPlayer = nil
+local VoidSpamEnabled = false
+local AttackEnabled = false
+
+local Settings = {
+    VoidSpamDistance = 1000000,
+    HideTime = 0.25,
+    AttackTime = 0.1,
+    OrbitRadius = 2,
+    OrbitSpeed = 100000000,
+    SpamRate = 0.05,
+}
+
+local lastSpam = 0
+local orbitAngle = 0
+
+-- ==================== GUI ====================
+local sg = Instance.new("ScreenGui")
+sg.Name = "WhjteVoidSpam"
+sg.ResetOnSpawn = false
+sg.DisplayOrder = 999999
+sg.Parent = game:GetService("CoreGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 340, 0, 580)
+mainFrame.Position = UDim2.new(0.5, -170, 0.1, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 30)
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = sg
+
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
+Instance.new("UIStroke", mainFrame).Color = Color3.fromRGB(120, 0, 255)
+
+-- Title
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,0,0,55)
+title.BackgroundColor3 = Color3.fromRGB(80, 0, 200)
+title.Text = "Whjte | Ragebot"
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 22
+title.Parent = mainFrame
+Instance.new("UICorner", title).CornerRadius = UDim.new(0,12)
+
+-- Tab Frame
