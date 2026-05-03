@@ -1,0 +1,209 @@
+-- Whjte Void Spam | Roblox | Mobile + PC Support
+-- RightShift = Toggle GUI (PC) | Tap Screen Edge (Mobile)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local TargetPlayer = nil
+local VoidSpamEnabled = false
+local OrbitAttackEnabled = false
+
+local Settings = {
+    VoidSpamDistance = 15,
+    OrbitRadius = 8,
+    OrbitSpeed = 15,
+    SpamRate = 0.08,
+}
+
+local lastSpam = 0
+local orbitAngle = 0
+
+-- ==================== GUI (Mobile Friendly) ====================
+local sg = Instance.new("ScreenGui")
+sg.Name = "WhjteVoidSpam"
+sg.ResetOnSpawn = false
+sg.DisplayOrder = 999999
+sg.Parent = game:GetService("CoreGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 300, 0, 520)
+mainFrame.Position = UDim2.new(0.5, -150, 0.3, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 35)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = sg
+
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
+Instance.new("UIStroke", mainFrame).Color = Color3.fromRGB(120, 0, 255)
+
+-- Title
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,0,0,50)
+title.BackgroundColor3 = Color3.fromRGB(90, 0, 220)
+title.Text = "⚡ Whjte Void Spam"
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 20
+title.Parent = mainFrame
+Instance.new("UICorner", title).CornerRadius = UDim.new(0,12)
+
+-- Tab System
+local currentTab = "Void"
+
+local function createButton(parent, text, yOffset, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 50)
+    btn.Position = UDim2.new(0.05, 0, 0, yOffset)
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
+    btn.Text = text
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 16
+    btn.Parent = parent
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,10)
+    
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+local function createSlider(parent, label, min, max, default, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0.9, 0, 0, 70)
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
+
+    local lbl = Instance.new("TextLabel", frame)
+    lbl.Size = UDim2.new(1,0,0,20)
+    lbl.Text = label .. ": " .. default
+    lbl.TextColor3 = Color3.new(1,1,1)
+    lbl.BackgroundTransparency = 1
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 15
+
+    local sliderBar = Instance.new("Frame", frame)
+    sliderBar.Size = UDim2.new(1,0,0,12)
+    sliderBar.Position = UDim2.new(0,0,0,30)
+    sliderBar.BackgroundColor3 = Color3.fromRGB(40,40,70)
+    Instance.new("UICorner", sliderBar).CornerRadius = UDim.new(0,6)
+
+    local fill = Instance.new("Frame", sliderBar)
+    fill.Size = UDim2.new((default-min)/(max-min), 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(120, 0, 255)
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(0,6)
+
+    local dragging = false
+    sliderBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if not dragging then return end
+        local mousePos = input.Position.X
+        local barPos = sliderBar.AbsolutePosition.X
+        local barSize = sliderBar.AbsoluteSize.X
+        local percent = math.clamp((mousePos - barPos) / barSize, 0, 1)
+        local value = min + percent * (max - min)
+        value = math.round(value)
+
+        fill.Size = UDim2.new(percent, 0, 1, 0)
+        lbl.Text = label .. ": " .. value
+        callback(value)
+    end)
+end
+
+-- Void Spam Tab Content
+createButton(mainFrame, "Void Spam: OFF", 70, function(btn)
+    VoidSpamEnabled = not VoidSpamEnabled
+    btn.Text = "Void Spam: " .. (VoidSpamEnabled and "ON" or "OFF")
+    btn.BackgroundColor3 = VoidSpamEnabled and Color3.fromRGB(0, 170, 80) or Color3.fromRGB(60,60,90)
+end)
+
+createSlider(mainFrame, "Void Distance", 5, 50, 15, function(v) Settings.VoidSpamDistance = v end)
+
+-- Orbit Attack Tab Content
+createButton(mainFrame, "Orbit Attack: OFF", 220, function(btn)
+    OrbitAttackEnabled = not OrbitAttackEnabled
+    btn.Text = "Orbit Attack: " .. (OrbitAttackEnabled and "ON" or "OFF")
+    btn.BackgroundColor3 = OrbitAttackEnabled and Color3.fromRGB(0, 170, 80) or Color3.fromRGB(60,60,90)
+end)
+
+createSlider(mainFrame, "Orbit Radius", 4, 25, 8, function(v) Settings.OrbitRadius = v end)
+createSlider(mainFrame, "Orbit Speed", 5, 40, 15, function(v) Settings.OrbitSpeed = v end)
+
+-- Mobile Touch Support
+local function toggleGUI()
+    sg.Enabled = not sg.Enabled
+end
+
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        toggleGUI()
+    end
+end)
+
+-- Mobile tap support (tap top left corner)
+local touchButton = Instance.new("TextButton")
+touchButton.Size = UDim2.new(0, 80, 0, 60)
+touchButton.Position = UDim2.new(0, 10, 0, 10)
+touchButton.BackgroundTransparency = 0.7
+touchButton.Text = "Menu"
+touchButton.TextColor3 = Color3.new(1,1,1)
+touchButton.BackgroundColor3 = Color3.fromRGB(80,0,200)
+touchButton.Parent = sg
+Instance.new("UICorner", touchButton).CornerRadius = UDim.new(0,12)
+
+touchButton.MouseButton1Click:Connect(toggleGUI)
+
+-- ==================== MAIN LOOP ====================
+RunService.RenderStepped:Connect(function(dt)
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+
+    if not TargetPlayer or not TargetPlayer.Character then
+        -- Auto target nearest player
+        local closestDist = math.huge
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local d = (plr.Character.HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude
+                if d < closestDist then
+                    closestDist = d
+                    TargetPlayer = plr
+                end
+            end
+        end
+    end
+
+    -- Void Spam
+    if VoidSpamEnabled and TargetPlayer and TargetPlayer.Character and tick() - lastSpam > Settings.SpamRate then
+        local hrp = char.HumanoidRootPart
+        local targetHrp = TargetPlayer.Character.HumanoidRootPart
+        local dir = (hrp.Position - targetHrp.Position).Unit
+        hrp.CFrame = targetHrp.CFrame + dir * Settings.VoidSpamDistance + Vector3.new(math.random(-6,6), math.random(6,14), math.random(-6,6))
+        lastSpam = tick()
+    end
+
+    -- Orbit Attack
+    if OrbitAttackEnabled and TargetPlayer and TargetPlayer.Character then
+        local hrp = char.HumanoidRootPart
+        local targetHrp = TargetPlayer.Character.HumanoidRootPart
+        orbitAngle += Settings.OrbitSpeed * dt * 8
+        local offset = Vector3.new(math.cos(orbitAngle) * Settings.OrbitRadius, 6, math.sin(orbitAngle) * Settings.OrbitRadius)
+        hrp.CFrame = CFrame.new(targetHrp.Position + offset, targetHrp.Position)
+    end
+end)
+
+print("✅ Whjte Void Spam Loaded | Tap 'Menu' or RightShift")
