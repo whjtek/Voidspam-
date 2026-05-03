@@ -1,0 +1,163 @@
+-- Whjte Void Spam | Mobile Fixed Version
+-- Try this one if the previous didn't show
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+
+local TargetPlayer = nil
+local VoidSpamEnabled = false
+local AttackEnabled = false
+
+local Settings = {
+    VoidMinDistance = 50000,
+    VoidMaxDistance = 1000000,
+    AttackStandDistance = 5,
+    SpamRate = 0.05,
+    HideTime = 0.1,
+    AttackTime = 0.03,
+    TeamCheck = true,
+    DeadCheck = true,
+}
+
+local lastSpam = 0
+local attackPhase = "hide"
+local phaseStartTime = 0
+
+-- ==================== GUI (Mobile Safe) ====================
+local sg = Instance.new("ScreenGui")
+sg.Name = "WhjteVoidSpam"
+sg.ResetOnSpawn = false
+sg.DisplayOrder = 999999
+
+-- Try CoreGui first, fallback to PlayerGui
+if pcall(function() sg.Parent = game:GetService("CoreGui") end) then
+    print("Using CoreGui")
+else
+    sg.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    print("Using PlayerGui (CoreGui blocked)")
+end
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 340, 0, 560)
+mainFrame.Position = UDim2.new(0.5, -170, 0.15, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 30)
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Visible = true
+mainFrame.Parent = sg
+
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
+Instance.new("UIStroke", mainFrame).Color = Color3.fromRGB(110, 0, 255)
+
+-- Title
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,0,0,50)
+title.BackgroundColor3 = Color3.fromRGB(80, 0, 200)
+title.Text = "Whjte Voidspam"
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 20
+title.Parent = mainFrame
+Instance.new("UICorner", title).CornerRadius = UDim.new(0,8)
+
+-- Close Button
+local closeBtn = Instance.new("TextButton", mainFrame)
+closeBtn.Size = UDim2.new(0,40,0,40)
+closeBtn.Position = UDim2.new(1,-45,0,5)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200,50,50)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.new(1,1,1)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 20
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0,6)
+
+closeBtn.MouseButton1Click:Connect(function()
+    mainFrame.Visible = false
+end)
+
+-- Small Toggle Button (for mobile)
+local toggleBtn = Instance.new("TextButton", sg)
+toggleBtn.Size = UDim2.new(0,80,0,80)
+toggleBtn.Position = UDim2.new(0,20,1,-100)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(90,0,200)
+toggleBtn.Text = "⚡"
+toggleBtn.TextColor3 = Color3.new(1,1,1)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 32
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0,12)
+
+toggleBtn.MouseButton1Click:Connect(function()
+    mainFrame.Visible = not mainFrame.Visible
+end)
+
+-- ==================== TABS & CONTENT (simplified for visibility) ====================
+local voidTab = Instance.new("ScrollingFrame", mainFrame)
+voidTab.Size = UDim2.new(1,0,1,-60)
+voidTab.Position = UDim2.new(0,0,0,60)
+voidTab.BackgroundTransparency = 1
+voidTab.ScrollBarThickness = 6
+
+local list = Instance.new("UIListLayout", voidTab)
+list.Padding = UDim.new(0,10)
+
+local function createToggle(text, default, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.95,0,0,55)
+    btn.BackgroundColor3 = default and Color3.fromRGB(0,170,90) or Color3.fromRGB(55,55,80)
+    btn.Text = text .. ": " .. (default and "ON" or "OFF")
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 16
+    btn.Parent = voidTab
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
+
+    local state = default
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        btn.BackgroundColor3 = state and Color3.fromRGB(0,170,90) or Color3.fromRGB(55,55,80)
+        btn.Text = text .. ": " .. (state and "ON" or "OFF")
+        callback(state)
+    end)
+end
+
+createToggle("Void Spam", false, function(v) VoidSpamEnabled = v end)
+createToggle("Attack", false, function(v) AttackEnabled = v end)
+
+print("✅ Whjte Void Spam Injected - Check for GUI")
+
+-- ==================== MAIN LOOP ====================
+RunService.RenderStepped:Connect(function()
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+
+    -- Auto target
+    if not TargetPlayer or not TargetPlayer.Character then
+        local closest, dist = nil, math.huge
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local d = (plr.Character.HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude
+                if d < dist then
+                    dist = d
+                    closest = plr
+                end
+            end
+        end
+        TargetPlayer = closest
+    end
+
+    if VoidSpamEnabled and TargetPlayer and TargetPlayer.Character then
+        local hrp = char.HumanoidRootPart
+        local thrp = TargetPlayer.Character.HumanoidRootPart
+        local dir = (hrp.Position - thrp.Position).Unit
+        hrp.CFrame = thrp.CFrame + dir * Settings.VoidMaxDistance * 0.7 + Vector3.new(math.random(-10,10), math.random(8,20), math.random(-10,10))
+    end
+
+    if AttackEnabled and TargetPlayer and TargetPlayer.Character then
+        local hrp = char.HumanoidRootPart
+        local thrp = TargetPlayer.Character.HumanoidRootPart
+        hrp.CFrame = thrp.CFrame + (hrp.Position - thrp.Position).Unit * Settings.AttackStandDistance
+    end
+end)
