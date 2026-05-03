@@ -1,0 +1,294 @@
+-- Whjte Void Spam | Rivals Style UI
+-- Small Rectangle Toggle Button + Distance Panel Fix + Min/Max Distance
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+
+local TargetPlayer = nil
+local VoidSpamEnabled = false
+local AttackEnabled = false
+local ShowDistancePanel = true
+
+local Settings = {
+    VoidMinDistance = 50000,
+    VoidMaxDistance = 1000000,
+    OrbitRadius = 2,
+    OrbitSpeed = 100000000,
+    SpamRate = 0.05,
+    HideTime = 0.1,
+    AttackTime = 0.03,
+    TeamCheck = true,
+    DeadCheck = true,
+}
+
+local lastSpam = 0
+local orbitAngle = 0
+local attackPhase = "hide"
+local phaseStartTime = 0
+
+-- ==================== MAIN GUI ====================
+local sg = Instance.new("ScreenGui")
+sg.Name = "WhjteVoidSpam"
+sg.ResetOnSpawn = false
+sg.DisplayOrder = 999999
+sg.Parent = game:GetService("CoreGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 380, 0, 620)
+mainFrame.Position = UDim2.new(0.5, -190, 0.1, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(13, 13, 28)
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = sg
+
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
+Instance.new("UIStroke", mainFrame).Color = Color3.fromRGB(80, 120, 255)
+
+-- Title Bar
+local titleBar = Instance.new("Frame", mainFrame)
+titleBar.Size = UDim2.new(1,0,0,55)
+titleBar.BackgroundColor3 = Color3.fromRGB(20, 20, 45)
+titleBar.Parent = mainFrame
+
+local title = Instance.new("TextLabel", titleBar)
+title.Size = UDim2.new(1,0,1,0)
+title.BackgroundTransparency = 1
+title.Text = "Whjte Voidspam"
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 22
+
+local closeBtn = Instance.new("TextButton", titleBar)
+closeBtn.Size = UDim2.new(0,40,0,40)
+closeBtn.Position = UDim2.new(1,-45,0.5,-20)
+closeBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+closeBtn.Text = "✕"
+closeBtn.TextColor3 = Color3.new(1,1,1)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 20
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0,8)
+
+closeBtn.MouseButton1Click:Connect(function() mainFrame.Visible = false end)
+
+-- Small Rectangle Toggle Button (Bottom Left)
+local toggleBtn = Instance.new("TextButton", sg)
+toggleBtn.Size = UDim2.new(0, 65, 0, 65)
+toggleBtn.Position = UDim2.new(0, 15, 1, -85)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(70, 0, 180)
+toggleBtn.Text = "⚡"
+toggleBtn.TextColor3 = Color3.new(1,1,1)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 28
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0,12)
+
+toggleBtn.MouseButton1Click:Connect(function()
+    mainFrame.Visible = not mainFrame.Visible
+end)
+
+-- Tab System
+local tabFrame = Instance.new("Frame", mainFrame)
+tabFrame.Size = UDim2.new(1,0,0,50)
+tabFrame.Position = UDim2.new(0,0,0,55)
+tabFrame.BackgroundColor3 = Color3.fromRGB(20,20,40)
+
+local contents = {}
+
+local function switchTab(name)
+    for _, v in pairs(contents) do v.Visible = false end
+    if contents[name] then contents[name].Visible = true end
+end
+
+local function createTab(name, xPos)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.25, -4, 1, 0)
+    btn.Position = UDim2.new(xPos, 2, 0, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(30,30,55)
+    btn.Text = name
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 16
+    btn.Parent = tabFrame
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
+
+    local content = Instance.new("ScrollingFrame")
+    content.Size = UDim2.new(1,0,1,-115)
+    content.Position = UDim2.new(0,0,0,115)
+    content.BackgroundTransparency = 1
+    content.ScrollBarThickness = 5
+    content.Visible = false
+    content.Parent = mainFrame
+
+    Instance.new("UIListLayout", content).Padding = UDim.new(0,8)
+    
+    contents[name] = content
+    btn.MouseButton1Click:Connect(function() switchTab(name) end)
+    return content
+end
+
+local voidTab = createTab("Void Spam", 0)
+local attackTab = createTab("Attack", 0.25)
+local prioritizeTab = createTab("Prioritize", 0.5)
+local uiTab = createTab("UI", 0.75)
+
+-- Toggle & Slider
+local function createToggle(parent, text, default, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.95,0,0,52)
+    btn.BackgroundColor3 = default and Color3.fromRGB(0, 170, 100) or Color3.fromRGB(50,50,75)
+    btn.Text = text
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 16
+    btn.Parent = parent
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
+
+    local state = default
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        btn.BackgroundColor3 = state and Color3.fromRGB(0, 170, 100) or Color3.fromRGB(50,50,75)
+        callback(state)
+    end)
+end
+
+local function createSlider(parent, label, min, max, default, step, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0.95,0,0,70)
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
+
+    local lbl = Instance.new("TextLabel", frame)
+    lbl.Size = UDim2.new(1,0,0,22)
+    lbl.Text = label .. ": " .. default
+    lbl.TextColor3 = Color3.new(1,1,1)
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 15
+
+    local bar = Instance.new("Frame", frame)
+    bar.Size = UDim2.new(1,0,0,14)
+    bar.Position = UDim2.new(0,0,0,32)
+    bar.BackgroundColor3 = Color3.fromRGB(40,40,65)
+    Instance.new("UICorner", bar).CornerRadius = UDim.new(0,7)
+
+    local fill = Instance.new("Frame", bar)
+    fill.Size = UDim2.new((default-min)/(max-min),0,1,0)
+    fill.BackgroundColor3 = Color3.fromRGB(100, 180, 255)
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(0,7)
+
+    local dragging = false
+    bar.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dragging = true end end)
+    UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dragging = false end end)
+
+    UserInputService.InputChanged:Connect(function(i)
+        if not dragging then return end
+        local perc = math.clamp((i.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
+        local val = min + perc * (max - min)
+        if step then val = math.floor(val / step) * step end
+        fill.Size = UDim2.new((val-min)/(max-min),0,1,0)
+        lbl.Text = label .. ": " .. string.format("%.0f", val)
+        callback(val)
+    end)
+end
+
+-- Void Spam Tab
+createToggle(voidTab, "Void Spam Enabled", false, function(v) VoidSpamEnabled = v end)
+createSlider(voidTab, "Min Distance", 1000, 500000, 50000, 1000, function(v) Settings.VoidMinDistance = v end)
+createSlider(voidTab, "Max Distance", 100000, 2000000, 1000000, 1000, function(v) Settings.VoidMaxDistance = v end)
+
+-- Attack Tab
+createToggle(attackTab, "Attack Enabled", false, function(v) AttackEnabled = v end)
+createSlider(attackTab, "Hide Time", 0.05, 1.5, 0.1, 0.01, function(v) Settings.HideTime = v end)
+createSlider(attackTab, "Attack Time", 0.01, 0.5, 0.03, 0.01, function(v) Settings.AttackTime = v end)
+createSlider(attackTab, "Orbit Radius", 1, 10, 2, 0.5, function(v) Settings.OrbitRadius = v end)
+
+-- Prioritize Tab
+createToggle(prioritizeTab, "Team Check", true, function(v) Settings.TeamCheck = v end)
+createToggle(prioritizeTab, "Dead Check", true, function(v) Settings.DeadCheck = v end)
+
+-- UI Tab
+createToggle(uiTab, "Show Distance Panel", true, function(v) distancePanel.Visible = v end)
+
+-- Bottom Right Distance Panel
+local distancePanel = Instance.new("Frame", sg)
+distancePanel.Size = UDim2.new(0, 240, 0, 95)
+distancePanel.Position = UDim2.new(1, -260, 1, -115)
+distancePanel.BackgroundColor3 = Color3.fromRGB(10,10,25)
+distancePanel.BackgroundTransparency = 0.25
+Instance.new("UICorner", distancePanel).CornerRadius = UDim.new(0,10)
+
+local distanceLabel = Instance.new("TextLabel", distancePanel)
+distanceLabel.Size = UDim2.new(1,0,1,0)
+distanceLabel.BackgroundTransparency = 1
+distanceLabel.TextColor3 = Color3.new(1,1,1)
+distanceLabel.Font = Enum.Font.GothamSemibold
+distanceLabel.TextSize = 15
+distanceLabel.Text = "No Target\nDistance: 0 studs"
+
+-- ==================== MAIN LOOP ====================
+RunService.RenderStepped:Connect(function(dt)
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+
+    if not TargetPlayer or not TargetPlayer.Character then
+        local closest, dist = nil, math.huge
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character then
+                local root = plr.Character:FindFirstChild("HumanoidRootPart")
+                local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+                if root and hum then
+                    if Settings.DeadCheck and hum.Health <= 0 then continue end
+                    if Settings.TeamCheck and plr.Team == LocalPlayer.Team then continue end
+                    local d = (root.Position - char.HumanoidRootPart.Position).Magnitude
+                    if d < dist then dist = d; closest = plr end
+                end
+            end
+        end
+        TargetPlayer = closest
+    end
+
+    -- Void Spam with Min/Max Distance
+    if VoidSpamEnabled and TargetPlayer and TargetPlayer.Character and tick() - lastSpam > Settings.SpamRate then
+        local hrp = char.HumanoidRootPart
+        local thrp = TargetPlayer.Character.HumanoidRootPart
+        local dir = (hrp.Position - thrp.Position).Unit
+        local dist = (hrp.Position - thrp.Position).Magnitude
+        local targetDist = math.clamp(dist, Settings.VoidMinDistance, Settings.VoidMaxDistance)
+        hrp.CFrame = thrp.CFrame + dir * targetDist + Vector3.new(math.random(-12,12), math.random(8,20), math.random(-12,12))
+        lastSpam = tick()
+    end
+
+    -- Attack with Hide / Attack Cycle
+    if AttackEnabled and TargetPlayer and TargetPlayer.Character then
+        local currentTime = tick()
+        if currentTime - phaseStartTime > (attackPhase == "hide" and Settings.HideTime or Settings.AttackTime) then
+            attackPhase = attackPhase == "hide" and "attack" or "hide"
+            phaseStartTime = currentTime
+        end
+
+        local hrp = char.HumanoidRootPart
+        local thrp = TargetPlayer.Character.HumanoidRootPart
+
+        if attackPhase == "hide" then
+            local dir = (hrp.Position - thrp.Position).Unit
+            hrp.CFrame = thrp.CFrame + dir * Settings.VoidMaxDistance * 0.7
+        else
+            orbitAngle += Settings.OrbitSpeed * dt * 0.4
+            local offset = Vector3.new(math.cos(orbitAngle) * Settings.OrbitRadius, 6, math.sin(orbitAngle) * Settings.OrbitRadius)
+            hrp.CFrame = CFrame.new(thrp.Position + offset, thrp.Position)
+        end
+    end
+
+    -- Update Distance Panel
+    if TargetPlayer and TargetPlayer.Character then
+        local dist = (TargetPlayer.Character.HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude
+        distanceLabel.Text = "Target: "..TargetPlayer.Name.."\nDistance: "..math.floor(dist).." studs"
+    else
+        distanceLabel.Text = "No Target\nDistance: 0 studs"
+    end
+end)
+
+switchTab("Void Spam")
+
+print("✅ Whjte Void Spam Loaded - Rivals Style")
